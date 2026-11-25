@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ПИНГ-ПОНГ: РЕТРО АРКАДА</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --wood-dark: #4a2e1b;
+    --wood-light: #7c4d2b;
+    --court-bg: #2e5a36;
+    --court-line: #f4f1ea;
+    --panel-bg: #f4efe6;
+    --ink: #221c17;
+    --muted: #6e6256;
+    --accent: #d94e28;
+    --gold: #e09f24;
+  }
+  body.theme-graphite {
+    --wood-dark: #1e2024;
+    --wood-light: #353942;
+    --court-bg: #252930;
+    --court-line: #e6e8ec;
+    --panel-bg: #eceef2;
+    --ink: #181a1f;
+    --muted: #5c6370;
+    --accent: #2b7fff;
+    --gold: #e59a19;
+  }
+  body.theme-paper {
+    --wood-dark: #5c5346;
+    --wood-light: #8c7f6a;
+    --court-bg: #f7f3e8;
+    --court-line: #2c2825;
+    --panel-bg: #ffffff;
+    --ink: #2c2825;
+    --muted: #787067;
+    --accent: #c83e2b;
+    --gold: #d48b17;
+  }
+
+  * { box-sizing: border-box; user-select: none; -webkit-user-select: none; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: repeating-linear-gradient(45deg, var(--wood-dark), var(--wood-dark) 18px, var(--wood-light) 18px, var(--wood-light) 36px);
+    color: var(--ink);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    padding: 8px;
+  }
+
+  .cabinet {
+    width: 100%;
+    max-width: 460px;
+    height: 96vh;
+    max-height: 820px;
+    background: var(--panel-bg);
+    border: 6px solid var(--wood-dark);
+    border-radius: 22px;
+    box-shadow: 0 18px 45px rgba(0,0,0,0.55), inset 0 2px 0 rgba(255,255,255,0.6);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 10px 12px;
+    position: relative;
+  }
+
+  .hud {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(0,0,0,0.06);
+    border: 2px solid rgba(0,0,0,0.12);
+    border-radius: 14px;
+    padding: 6px 12px;
+  }
+  .score-block { text-align: center; min-width: 72px; }
+  .score-lbl { font-size: 11px; font-weight: 800; text-transform: uppercase; color: var(--muted); }
+  .score-num { font-size: 26px; font-weight: 900; line-height: 1.05; color: var(--ink); }
+
+  .center-info { text-align: center; }
+  .mode-tag {
+    display: inline-block;
+    background: var(--accent);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 3px 10px;
+    border-radius: 12px;
+    letter-spacing: 0.5px;
+  }
+  .sub-tag { font-size: 11px; font-weight: 700; color: var(--muted); margin-top: 2px; }
+
+  .pause-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    border: 2px solid rgba(0,0,0,0.18);
+    background: #fff;
+    color: var(--ink);
+    font-weight: 900;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  .court-wrap {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 8px 0;
+    position: relative;
+  }
+  canvas#pongCanvas {
+    border: 5px solid var(--wood-dark);
+    border-radius: 14px;
+    box-shadow: inset 0 0 24px rgba(0,0,0,0.35), 0 6px 16px rgba(0,0,0,0.2);
+    touch-action: none;
+    cursor: none;
+  }
+
+  .hint-bar {
+    text-align: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    padding: 2px 0;
+  }
+
+  .overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(24, 18, 12, 0.84);
+    backdrop-filter: blur(4px);
+    border-radius: 16px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 20;
+    padding: 16px;
+  }
+  .overlay.hidden { display: none; }
+
+  .card {
+    width: 100%;
+    max-width: 360px;
+    background: var(--panel-bg);
+    border: 4px solid var(--wood-dark);
+    border-radius: 20px;
+    padding: 20px 18px;
+    text-align: center;
+    box-shadow: 0 16px 36px rgba(0,0,0,0.45);
+  }
+  .game-title {
+    font-size: 26px;
+    font-weight: 900;
+    color: var(--ink);
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+  }
+  .game-sub {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+
+  .btn {
+    width: 100%;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    border-radius: 12px;
+    border: 2px solid rgba(0,0,0,0.15);
+    background: #fff;
+    color: var(--ink);
+    font-size: 15px;
+    font-weight: 800;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: transform 0.1s;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn.primary {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+    justify-content: center;
+    box-shadow: 0 5px 14px rgba(217, 78, 40, 0.35);
+  }
+  .btn small { font-size: 12px; font-weight: 700; opacity: 0.8; }
+
+  .chips {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin: 8px 0 12px;
+  }
+  .chip {
+    padding: 7px 4px;
+    border-radius: 10px;
+    border: 2px solid rgba(0,0,0,0.14);
+    background: #fff;
+    color: var(--ink);
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  .chip.active {
+    background: var(--gold);
+    color: #1c1408;
+    border-color: var(--ink);
+  }
+</style>
+</head>
+<body>
+
+<div class="cabinet">
+  <div class="hud">
+    <div class="score-block">
+      <div class="score-lbl" id="topLabel">СОПЕРНИК</div>
+      <div class="score-num" id="topScore">0</div>
+    </div>
+    <div class="center-info">
+      <div class="mode-tag" id="modeTag">ПРОТИВ БОТА</div>
+      <div class="sub-tag" id="goalTag">До 7 очков</div>
+    </div>
+    <div class="score-block">
+      <div class="score-lbl">ВЫ</div>
+      <div class="score-num" id="botScore">0</div>
+    </div>
+    <button class="pause-btn" id="pauseBtn" title="Пауза (Esc)">II</button>
+  </div>
+
+  <div class="court-wrap" id="courtWrap">
+    <canvas id="pongCanvas" width="380" height="540"></canvas>
+  </div>
+
+  <div class="hint-bar" id="hintBar">Веди пальцем или мышкой по столу • Пауза: Esc</div>
+
+  <!-- ГЛАВНОЕ МЕНЮ -->
+  <div class="overlay" id="menuOverlay">
+    <div class="card">
+      <div class="game-title">ПИНГ-ПОНГ</div>
+      <div class="game-sub">Ретро Аркада • Сбалансированный темп</div>
+
+      <button class="btn primary" onclick="startMatch('solo')">ИГРАТЬ ПРОТИВ БОТА</button>
+      <button class="btn" onclick="startMatch('arcade')">
+        <span>АРКАДА С БОНУСАМИ</span>
+        <small>+Размер / Замедление</small>
+      </button>
+      <button class="btn" onclick="startMatch('duo')">
+        <span>НА ДВОИХ (1 ЭКРАН)</span>
+        <small>Верх и низ</small>
+      </button>
+
+      <div style="font-size:11px; font-weight:800; color:var(--muted); margin-top:6px;">ПОКРЫТИЕ СТОЛА:</div>
+      <div class="chips">
+        <button class="chip active" onclick="setTableTheme('', this)">Зелёный</button>
+        <button class="chip" onclick="setTableTheme('theme-graphite', this)">Графит</button>
+        <button class="chip" onclick="setTableTheme('theme-paper', this)">Блокнот</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ПАУЗА -->
+  <div class="overlay hidden" id="pauseOverlay">
+    <div class="card">
+      <div class="game-title">ПАУЗА</div>
+      <div class="game-sub">Матч приостановлен</div>
+      <button class="btn primary" onclick="togglePause(false)">Продолжить</button>
+      <button class="btn" onclick="restartMatch()">Начать заново</button>
+      <button class="btn" id="soundBtn" onclick="toggleSound()">Звук: Вкл</button>
+      <button class="btn" onclick="goMenu()">В главное меню</button>
+    </div>
+  </div>
+
+  <!-- ФИНАЛ МАТЧА -->
+  <div class="overlay hidden" id="endOverlay">
+    <div class="card">
+      <div class="game-title" id="endTitle">ПОБЕДА!</div>
+      <div class="game-sub" id="endSub">Счёт 7 : 4</div>
+      <button class="btn primary" onclick="restartMatch()">Сыграть ещё раз</button>
+      <button class="btn" onclick="goMenu()">В главное меню</button>
+    </div>
+  </div>
+</div>
+
+<script>
+if (window.Telegram && window.Telegram.WebApp) {
+  window.Telegram.WebApp.ready();
+  window.Telegram.WebApp.expand();
+}
+
+const SoundFX = {
+  ctx: null,
+  on: true,
+  play(freq, dur = 0.08, type = 'triangle', vol = 0.16) {
+    if (!this.on) return;
+    if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+    gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + dur);
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start();
+    osc.stop(this.ctx.currentTime + dur);
+  },
+  hit() { this.play(480, 0.07, 'triangle', 0.18); },
+  wall() { this.play(310, 0.06, 'sine', 0.14); },
+  bonus() { this.play(720, 0.16, 'sine', 0.18); },
+  goal() {
+    this.play(260, 0.16, 'sawtooth', 0.16);
+    setTimeout(() => this.play(190, 0.22, 'sawtooth', 0.16), 110);
+  },
+  win() {
+    [523, 659, 784].forEach((f, i) => setTimeout(() => this.play(f, 0.18, 'triangle', 0.18), i * 100));
+  }
+};
+
+const canvas = document.getElementById('pongCanvas');
+const ctx = canvas.getContext('2d');
+const wrap = document.getElementById('courtWrap');
+
+let theme = '';
+let mode = 'solo';
+let paused = false;
+let ended = false;
+const WIN_SCORE = 7;
+
+let playerScore = 0;
+let rivalScore = 0;
+
+// Таймаут после гола (1.5 сек)
+let goalTimeout = 0;
+let goalBanner = '';
+let nextServeDir = 1;
+
+// Ракетки
+const player = { x: 190, w: 96, baseW: 96, h: 14, y: 510, prevX: 190, vx: 0 };
+const rival  = { x: 190, w: 96, baseW: 96, h: 14, y: 30,  prevX: 190, vx: 0, aimError: 0, reactTimer: 0 };
+
+// Мяч (темп выше среднего: бодрый старт ~430 px/сек)
+const ball = { x: 190, y: 270, r: 9, vx: 0, vy: 0, speed: 435 };
+
+let bonusItem = null;
+let bonusTimer = 0;
+let particles = [];
+const keys = {};
+
+function resizeCourt() {
+  const w = Math.min(wrap.clientWidth - 8, 420);
+  const h = Math.min(wrap.clientHeight - 8, 620);
+  canvas.width = Math.max(260, w);
+  canvas.height = Math.max(360, h);
+  player.y = canvas.height - 26;
+  rival.y = 26;
+  player.x = Math.min(Math.max(player.w / 2, player.x), canvas.width - player.w / 2);
+  rival.x = Math.min(Math.max(rival.w / 2, rival.x), canvas.width - rival.w / 2);
+}
+window.addEventListener('resize', resizeCourt);
+resizeCourt();
+
+function setTableTheme(cls, btn) {
+  theme = cls;
+  document.body.className = cls;
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+}
+
+function startMatch(selectedMode) {
+  mode = selectedMode;
+  paused = false;
+  ended = false;
+  playerScore = 0;
+  rivalScore = 0;
+  bonusItem = null;
+  bonusTimer = 4;
+  particles = [];
+
+  player.w = player.baseW = 96;
+  rival.w = rival.baseW = 96;
+  player.x = canvas.width / 2;
+  rival.x = canvas.width / 2;
+
+  document.getElementById('modeTag').textContent =
+    mode === 'solo' ? 'ПРОТИВ БОТА' : mode === 'arcade' ? 'АРКАДА + БОНУСЫ' : 'НА ДВОИХ';
+  document.getElementById('topLabel').textContent = mode === 'duo' ? 'ИГРОК 2' : 'БОТ';
+  document.getElementById('hintBar').textContent =
+    mode === 'duo' ? 'Верхний и нижний игроки водят пальцами по своим половинам' : 'Веди пальцем или мышкой • Стрелки A/D • Пауза: Esc';
+
+  document.getElementById('menuOverlay').classList.add('hidden');
+  document.getElementById('pauseOverlay').classList.add('hidden');
+  document.getElementById('endOverlay').classList.add('hidden');
+
+  updateScoreboard();
+  triggerGoalTimeout('ПРИГОТОВЬТЕСЬ!', Math.random() < 0.5 ? 1 : -1, 1.1);
+}
+
+function restartMatch() { startMatch(mode); }
+
+function goMenu() {
+  paused = false;
+  document.getElementById('pauseOverlay').classList.add('hidden');
+  document.getElementById('endOverlay').classList.add('hidden');
+  document.getElementById('menuOverlay').classList.remove('hidden');
+}
+
+function togglePause(force) {
+  if (ended || !document.getElementById('menuOverlay').classList.contains('hidden')) return;
+  paused = typeof force === 'boolean' ? force : !paused;
+  document.getElementById('pauseOverlay').classList.toggle('hidden', !paused);
+}
+
+function toggleSound() {
+  SoundFX.on = !SoundFX.on;
+  document.getElementById('soundBtn').textContent = SoundFX.on ? 'Звук: Вкл' : 'Звук: Выкл';
+}
+
+document.getElementById('pauseBtn').onclick = () => togglePause();
+window.addEventListener('keydown', e => {
+  keys[e.key.toLowerCase()] = true;
+  if (e.key === 'Escape') togglePause();
+});
+window.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+function triggerGoalTimeout(label, serveDir, duration = 1.5) {
+  goalBanner = label;
+  nextServeDir = serveDir;
+  goalTimeout = duration;
+  ball.x = canvas.width / 2;
+  ball.y = canvas.height / 2;
+  ball.vx = 0;
+  ball.vy = 0;
+  player.w = player.baseW;
+  rival.w = rival.baseW;
+}
+
+function launchBall(dirY) {
+  // Бодрая стартовая скорость выше среднего
+  ball.speed = 435;
+  const angle = (Math.random() * 0.65 - 0.325);
+  ball.vx = Math.sin(angle) * ball.speed;
+  ball.vy = Math.cos(angle) * ball.speed * dirY;
+}
+
+function updateScoreboard() {
+  document.getElementById('botScore').textContent = playerScore;
+  document.getElementById('topScore').textContent = rivalScore;
+}
+
+function spawnSparks(x, y, color) {
+  for (let i = 0; i < 12; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const s = 60 + Math.random() * 160;
+    particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0.45, color });
+  }
+}
+
+// Сенсорное и мышиное управление (поддержка 2 пальцев для режима На двоих)
+function handlePointer(clientX, clientY) {
+  if (paused || ended) return;
+  const rect = canvas.getBoundingClientRect();
+  const relX = ((clientX - rect.left) / rect.width) * canvas.width;
+  const relY = ((clientY - rect.top) / rect.height) * canvas.height;
+
+  if (mode === 'duo' && relY < canvas.height / 2) {
+    rival.x = Math.min(Math.max(rival.w / 2, relX), canvas.width - rival.w / 2);
+  } else {
+    player.x = Math.min(Math.max(player.w / 2, relX), canvas.width - player.w / 2);
+  }
+}
+
+canvas.addEventListener('mousemove', e => handlePointer(e.clientX, e.clientY));
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  for (let i = 0; i < e.touches.length; i++) handlePointer(e.touches[i].clientX, e.touches[i].clientY);
+}, { passive: false });
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  for (let i = 0; i < e.touches.length; i++) handlePointer(e.touches[i].clientX, e.touches[i].clientY);
+}, { passive: false });
+
+function update(dt) {
+  if (paused || ended || !document.getElementById('menuOverlay').classList.contains('hidden')) return;
+
+  // Клавиатура ПК
+  const keySpeed = 480;
+  if (keys['arrowleft'] || keys['a'] || keys['ф']) player.x -= keySpeed * dt;
+  if (keys['arrowright'] || keys['d'] || keys['в']) player.x += keySpeed * dt;
+  player.x = Math.min(Math.max(player.w / 2, player.x), canvas.width - player.w / 2);
+
+  player.vx = (player.x - player.prevX) / Math.max(dt, 0.001);
+  player.prevX = player.x;
+
+  // Ослабленный человечный бот (реагирует с задержкой и небольшой ошибкой)
+  if (mode !== 'duo') {
+    rival.reactTimer -= dt;
+    if (rival.reactTimer <= 0) {
+      rival.reactTimer = 0.22 + Math.random() * 0.16;
+      rival.aimError = (Math.random() - 0.5) * 68;
+    }
+    const targetX = ball.vy < 0 ? (ball.x + rival.aimError) : (canvas.width / 2);
+    const diff = targetX - rival.x;
+    const maxBotSpeed = 265;
+    if (Math.abs(diff) > 6) {
+      rival.x += Math.sign(diff) * Math.min(Math.abs(diff), maxBotSpeed * dt);
+    }
+    rival.x = Math.min(Math.max(rival.w / 2, rival.x), canvas.width - rival.w / 2);
+  }
+
+  // Обработка таймаута после гола
+  if (goalTimeout > 0) {
+    goalTimeout -= dt;
+    if (goalTimeout <= 0) {
+      goalTimeout = 0;
+      launchBall(nextServeDir);
+    }
+    return;
+  }
+
+  // Движение мяча
+  ball.x += ball.vx * dt;
+  ball.y += ball.vy * dt;
+
+  // Отскок от левой и правой стенок
+  if (ball.x - ball.r <= 0) {
+    ball.x = ball.r;
+    ball.vx = Math.abs(ball.vx);
+    SoundFX.wall();
+  } else if (ball.x + ball.r >= canvas.width) {
+    ball.x = canvas.width - ball.r;
+    ball.vx = -Math.abs(ball.vx);
+    SoundFX.wall();
+  }
+
+  // Отскок от нижней ракетки (Игрок)
+  if (ball.vy > 0 &&
+      ball.y + ball.r >= player.y - player.h / 2 &&
+      ball.y - ball.r <= player.y + player.h / 2 &&
+      Math.abs(ball.x - player.x) <= player.w / 2 + ball.r) {
+    ball.y = player.y - player.h / 2 - ball.r;
+    const hitOffset = (ball.x - player.x) / (player.w / 2);
+    const spin = Math.max(-140, Math.min(140, player.vx * 0.18));
+    ball.speed = Math.min(680, ball.speed + 14);
+    const angle = hitOffset * 0.85;
+    ball.vx = Math.sin(angle) * ball.speed + spin;
+    ball.vy = -Math.cos(angle) * ball.speed;
+    SoundFX.hit();
+    spawnSparks(ball.x, ball.y, '#ffd166');
+  }
+
+  // Отскок от верхней ракетки (Бот / Игрок 2)
+  if (ball.vy < 0 &&
+      ball.y - ball.r <= rival.y + rival.h / 2 &&
+      ball.y + ball.r >= rival.y - rival.h / 2 &&
+      Math.abs(ball.x - rival.x) <= rival.w / 2 + ball.r) {
+    ball.y = rival.y + rival.h / 2 + ball.r;
+    const hitOffset = (ball.x - rival.x) / (rival.w / 2);
+    ball.speed = Math.min(680, ball.speed + 12);
+    const angle = hitOffset * 0.8;
+    ball.vx = Math.sin(angle) * ball.speed;
+    ball.vy = Math.cos(angle) * ball.speed;
+    SoundFX.hit();
+    spawnSparks(ball.x, ball.y, '#ffffff');
+  }
+
+  // Аркадные бонусы на столе
+  if (mode === 'arcade') {
+    bonusTimer -= dt;
+    if (!bonusItem && bonusTimer <= 0) {
+      bonusItem = {
+        x: 60 + Math.random() * (canvas.width - 120),
+        y: canvas.height * (0.35 + Math.random() * 0.3),
+        r: 16,
+        type: Math.random() < 0.55 ? 'wide' : 'slow'
+      };
+      bonusTimer = 7;
+    }
+    if (bonusItem && Math.hypot(ball.x - bonusItem.x, ball.y - bonusItem.y) <= ball.r + bonusItem.r) {
+      SoundFX.bonus();
+      spawnSparks(bonusItem.x, bonusItem.y, '#2ef2a6');
+      if (bonusItem.type === 'wide') {
+        if (ball.vy < 0) player.w = Math.min(155, player.w + 34);
+        else rival.w = Math.min(155, rival.w + 34);
+      } else {
+        ball.speed = Math.max(380, ball.speed * 0.84);
+        const curAng = Math.atan2(ball.vy, ball.vx);
+        ball.vx = Math.cos(curAng) * ball.speed;
+        ball.vy = Math.sin(curAng) * ball.speed;
+      }
+      bonusItem = null;
+    }
+  }
+
+  // Проверка гола
+  if (ball.y - ball.r > canvas.height) {
+    rivalScore++;
+    updateScoreboard();
+    SoundFX.goal();
+    if (rivalScore >= WIN_SCORE) return finishMatch(false);
+    triggerGoalTimeout('ГОЛ СОПЕРНИКА!', -1, 1.5);
+  } else if (ball.y + ball.r < 0) {
+    playerScore++;
+    updateScoreboard();
+    SoundFX.goal();
+    if (playerScore >= WIN_SCORE) return finishMatch(true);
+    triggerGoalTimeout('ВЫ ЗАБИЛИ ГОЛ!', 1, 1.5);
+  }
+
+  // Частицы
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.life -= dt;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+
+function finishMatch(playerWon) {
+  ended = true;
+  if (playerWon) SoundFX.win();
+  document.getElementById('endTitle').textContent =
+    mode === 'duo' ? (playerWon ? 'ПОБЕДИЛ НИЗ!' : 'ПОБЕДИЛ ВЕРХ!') : (playerWon ? 'ПОБЕДА!' : 'ПОРАЖЕНИЕ');
+  document.getElementById('endSub').textContent = `Итоговый счёт: ${playerScore} : ${rivalScore}`;
+  document.getElementById('endOverlay').classList.remove('hidden');
+}
+
+function draw() {
+  const styles = getComputedStyle(document.body);
+  const courtBg = styles.getPropertyValue('--court-bg').trim();
+  const lineCol = styles.getPropertyValue('--court-line').trim();
+
+  ctx.fillStyle = courtBg;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Разметка стола
+  ctx.strokeStyle = lineCol;
+  ctx.globalAlpha = 0.32;
+  ctx.lineWidth = 3;
+  ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
+
+  ctx.setLineDash([12, 10]);
+  ctx.beginPath();
+  ctx.moveTo(10, canvas.height / 2);
+  ctx.lineTo(canvas.width - 10, canvas.height / 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.beginPath();
+  ctx.arc(canvas.width / 2, canvas.height / 2, 46, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  // Бонус на столе
+  if (bonusItem) {
+    ctx.save();
+    ctx.fillStyle = bonusItem.type === 'wide' ? '#27ae60' : '#2980b9';
+    ctx.beginPath();
+    ctx.arc(bonusItem.x, bonusItem.y, bonusItem.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(bonusItem.type === 'wide' ? '+W' : 'SLOW', bonusItem.x, bonusItem.y);
+    ctx.restore();
+  }
+
+  // Ракетки
+  drawPaddle(rival.x, rival.y, rival.w, rival.h, '#d94e28');
+  drawPaddle(player.x, player.y, player.w, player.h, '#e09f24');
+
+  // Мяч
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.28)';
+  ctx.beginPath();
+  ctx.arc(ball.x + 3, ball.y + 4, ball.r, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = theme === 'theme-paper' ? '#d94e28' : '#ffffff';
+  ctx.beginPath();
+  ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Искры
+  particles.forEach(p => {
+    ctx.globalAlpha = Math.max(0, p.life * 2);
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
+    ctx.globalAlpha = 1;
+  });
+
+  // Табличка таймаута после гола
+  if (goalTimeout > 0) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(20, 16, 12, 0.78)';
+    ctx.beginPath();
+    ctx.roundRect(canvas.width / 2 - 135, canvas.height / 2 - 42, 270, 84, 14);
+    ctx.fill();
+    ctx.strokeStyle = '#ffd166';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.fillStyle = '#fff';
+    ctx.font = '900 18px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(goalBanner, canvas.width / 2, canvas.height / 2 - 8);
+
+    ctx.fillStyle = '#ffd166';
+    ctx.font = '700 14px sans-serif';
+    ctx.fillText(`Подача через ${goalTimeout.toFixed(1)} сек...`, canvas.width / 2, canvas.height / 2 + 20);
+    ctx.restore();
+  }
+}
+
+function drawPaddle(cx, cy, w, h, color) {
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.beginPath();
+  ctx.roundRect(cx - w / 2 + 2, cy - h / 2 + 4, w, h, 7);
+  ctx.fill();
+
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.roundRect(cx - w / 2, cy - h / 2, w, h, 7);
+  ctx.fill();
+
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+}
+
+let lastTime = performance.now();
+function loop(now) {
+  const dt = Math.min(0.05, (now - lastTime) / 1000);
+  lastTime = now;
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
